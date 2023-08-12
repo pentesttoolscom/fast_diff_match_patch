@@ -20,6 +20,13 @@ class DiffTests(unittest.TestCase):
             checklines=False)
         self.assertEqual(actual, expected_counts_only)
 
+    def assertDiffCount(self, text1, text2, max_diff, expected_count):
+        actual = fast_diff_match_patch.diff_count(
+            text1, text2,
+            timelimit=15,
+            max_diff=max_diff)
+        self.assertEqual(actual, expected_count)
+
     def test_string(self):
         self.assertDiff(
             '',
@@ -50,6 +57,41 @@ class DiffTests(unittest.TestCase):
                 ('+', 16),
                 ('=', 7),
             ]
+        )
+
+        self.assertDiffCount(
+            '',
+            '',
+            0,
+            0,
+        )
+
+        self.assertDiffCount(
+            'this is a test',
+            'this is a test',
+            1,
+            0,
+        )
+
+        self.assertDiffCount(
+            'this is a test',
+            'this program is not \u2192 a test',
+            15,
+            14,
+        )
+
+        self.assertDiffCount(
+            'this is a test',
+            'this program is not \u2192 a test',
+            10,
+            14,
+        )
+
+        self.assertDiffCount(
+            'this is a tesa',
+            'this program is not \u2192 a test',
+            10,
+            32,
         )
 
     def test_binary(self):
