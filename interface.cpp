@@ -252,7 +252,6 @@ diff_match_patch__diff_count__impl(PyObject *self, PyObject *args, PyObject *kwa
 {
     typename Shim::PY_ARG_TYPE a, b;
     float timelimit = 0.0;
-    int checklines = 1;
     char format_spec[64];
     int max_diff = -1;
 
@@ -260,14 +259,13 @@ diff_match_patch__diff_count__impl(PyObject *self, PyObject *args, PyObject *kwa
         strdup("left_document"),
         strdup("right_document"),
         strdup("timelimit"),
-        strdup("checklines"),
         strdup("max_diff"),
         NULL };
 
-    sprintf(format_spec, "%s%s|fbi", Shim::PyArgFormat, Shim::PyArgFormat);
+    sprintf(format_spec, "%s%s|fi", Shim::PyArgFormat, Shim::PyArgFormat);
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, format_spec, kwlist,
                                      &a, &b,
-                                     &timelimit, &checklines, &max_diff))
+                                     &timelimit, &max_diff))
         return NULL;
     
     auto a_str = Shim::to_string(a),
@@ -294,8 +292,7 @@ diff_match_patch__diff_count__impl(PyObject *self, PyObject *args, PyObject *kwa
     Py_BEGIN_ALLOW_THREADS /* RELEASE THE GIL */
 
     dmp.Diff_Timeout = timelimit;
-    // ret = PyLong_FromLongLong(diff_count);
-    diff_count = dmp.diff_main_only_count(a_str, b_str, checklines, max_diff);
+    diff_count = dmp.diff_main_only_count(a_str, b_str, max_diff);
 
     Py_END_ALLOW_THREADS /* ACQUIRE THE GIL */
 
@@ -402,7 +399,7 @@ static PyMethodDef MyMethods[] = {
     {"diff", (PyCFunction)diff_match_patch__diff, METH_VARARGS|METH_KEYWORDS,
     "Compute the difference between two strings or bytes-like objects (Unicode and str's in Python 2). Returns a list of tuples (OP, LEN)."},
     {"diff_count", (PyCFunction)diff_match_patch__diff_count, METH_VARARGS|METH_KEYWORDS,
-    "Compute the difference between two strings or bytes-like objects (Unicode and str's in Python 2). Returns a list of tuples (OP, LEN)."},
+    "Compute the difference between two strings or bytes-like objects (Unicode and str's in Python 2). Returns the diff count measured in characters."},
     {"match_main", (PyCFunction)diff_match_patch__match, METH_VARARGS|METH_KEYWORDS,
     "Locate the best instance of 'pattern' in 'text' near 'loc'. Returns -1 if no match found."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
