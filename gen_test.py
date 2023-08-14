@@ -1,6 +1,7 @@
 import json
 import random
 import string
+import sys
 import time
 
 import fast_diff_match_patch as fdmp
@@ -104,7 +105,7 @@ def benchmark_diff(text1, text2, timelimit):
         diffs = fdmp.diff(text1, text2, cleanup="No", counts_only=True)
     count_old = sum(score for status, score in diffs if status != "=")
     end = time.time()
-    delta_old = "{:.3f}".format(end - start)
+    delta_old = end - start
 
     start = time.time()
     if timelimit:
@@ -112,15 +113,56 @@ def benchmark_diff(text1, text2, timelimit):
     else:
         count_new = fdmp.diff_count(text1, text2)
     end = time.time()
-    delta_new = "{:.3f}".format(end - start)
+    delta_new = end - start
 
-    if float(delta_old) < 24 and float(delta_new) < 24:
+    if delta_old < 24 and delta_new < 24:
         if len(text1) + len(text2) < 3000:
             assert count_old == count_new
         else:
             assert abs(count_old - count_new) / min(count_old, count_new) < 0.06
 
     return {"count_old": count_old, "delta_old": delta_old, "count_new": count_new, "delta_new": delta_new}
+
+def run_test_n(generator, args, n_texts, repeat, timelimit=True):
+    texts_list = [generator(*args) for _ in range(n_texts)]
+    result = {"generator": generator.__name__, "delta_new": 0, "delta_old": 0, "repeat": repeat}
+    while repeat > 0:
+        temp_results = []
+        for texts in texts_list[:repeat]:
+            temp_results.append(benchmark_diff(*texts, timelimit))
+        repeat -= len(texts_list)
+
+        for temp_result in temp_results:
+            result["delta_new"] += temp_result["delta_new"]
+            result["delta_old"] += temp_result["delta_old"]
+
+    return result
+
+def benchmark_repeat(size1, size2, timelimit=True, repeat=1000, n_texts=50):
+    batch_start = time.time()
+    print(f"Benchmark repeat batch {(size1, size2)}")
+    min_size = min(size1, size2)
+    common_lens = [min_size // 2]
+
+    results = []
+
+    names = ("size1", "size2")
+    input = (size1, size2)
+    result = run_test_n(gen_test_random_utf8, input, n_texts, repeat, timelimit)
+    result.update(dict(zip(names, input)))
+    results.append(result)
+
+    names = ("size1", "size2", "common_len")
+    for common_len in common_lens:
+        input = (size1, size2, common_len)
+
+        result = run_test_n(gen_test_common_subsequence_utf8, input, n_texts, repeat, timelimit)
+        result.update(dict(zip(names, input)))
+        results.append(result)
+
+    batch_end = time.time()
+    print(f"Batch time: {batch_end - batch_start:.2f}")
+    return results
 
 def benchmark_batch(size1, size2, timelimit=True):
     batch_start = time.time()
@@ -214,15 +256,14 @@ def quick_test():
     speedup = f"{float(result['delta_old']) / float(result['delta_new']):.2f}"
     print(f"text1_len: 60345; text2_len: 70022; time_new: {result['delta_new']}; time_old: {result['delta_old']}; speedup: {speedup}")
 
-def main():
-    print("Quick test:")
-    quick_test()
-    print("Quick test done.")
-
+def do_repeat():
     results = []
-    print("Start benchmark")
+    results += benchmark_repeat(1000, 1000, timelimit=False, repeat=5000)
+    return results
+
+def do_main():
+    results = []
     try:
-        #results += benchmark_batch(10**3, 2*10**6)
         results += benchmark_batch(10, 10, timelimit=False)
         results += benchmark_batch(10**6, 10**6)
         results += benchmark_batch(10**2, 10**2, timelimit=False)
@@ -235,9 +276,26 @@ def main():
     except Exception:
         print("Benchmark hasn't finished successfully.")
 
-    with open("results.json", "w") as f:
-        print("Storing results in results.json...")
-        f.write(json.dumps(results, sort_keys=True, indent=4))
+    return results
+
+def main():
+    print("Quick test:")
+    #quick_test()
+    print("Quick test done.")
+
+    print("Start benchmark")
+
+    if len(sys.argv) > 1 and sys.argv[1] == "repeat":
+        print("Repeat mode.")
+        results = do_repeat()
+        with open("results_repeat.json", "w") as f:
+            print("Storing results in results_repeat.json...")
+            f.write(json.dumps(results, sort_keys=True, indent=4))
+    else:
+        results = do_main()
+        with open("results.json", "w") as f:
+            print("Storing results in results.json...")
+            f.write(json.dumps(results, sort_keys=True, indent=4))
 
 if __name__ == "__main__":
     main()
