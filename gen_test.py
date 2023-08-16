@@ -280,7 +280,7 @@ def do_main():
 
 def main():
     print("Quick test:")
-    #quick_test()
+    quick_test()
     print("Quick test done.")
 
     print("Start benchmark")
